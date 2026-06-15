@@ -154,9 +154,12 @@ function newobject:update(dt)
 				self.x = mx - self.clickx
 			end
 			local basechildren = loveframes.base.children
+			local ondock = self.OnDock
+			-- OnDock callback signature: OnDock(frame, object, direction, docked)
+			--   frame     = this frame, object = the frame docked to / undocked from,
+			--   direction = "top"/"bottom"/"left"/"right", docked = true on dock, false on undock
 			-- check for frames to dock with
 			if dockable then
-				local ondock = self.OnDock
 				for k, v in ipairs(basechildren) do
 					if v.type == "frame" then
 						local topcol = loveframes.RectangleCollisionCheck(self.dockzones.bottom, v.dockzones.top)
@@ -165,31 +168,30 @@ function newobject:update(dt)
 						local rightcol = loveframes.RectangleCollisionCheck(self.dockzones.left, v.dockzones.right)
 						local candockobject = v.dockable
 						if candockobject then
-							if topcol and not dockedtop then
+							if topcol and not self.dockedtop then
 								self.y = v.y - self.height
 								self.docky = my
 								self.dockedtop = true
 								self.topdockobject = v
-								-- FIXME: object?
-								-- if ondock then ondock(object, v) end
-							elseif botcol and not dockedbottom then
+								if ondock then ondock(self, v, "top", true) end
+							elseif botcol and not self.dockedbottom then
 								self.y = v.y + v.height
 								self.docky = my
 								self.dockedbottom = true
 								self.bottomdockobject = v
-								-- if ondock then ondock(object, v) end
-							elseif leftcol and not dockedleft then
+								if ondock then ondock(self, v, "bottom", true) end
+							elseif leftcol and not self.dockedleft then
 								self.x = v.x - self.width
 								self.dockx = mx
 								self.dockedleft = true
 								self.leftdockobject = v
-								-- if ondock then ondock(object, v) end
-							elseif rightcol and not dockedright then
+								if ondock then ondock(self, v, "left", true) end
+							elseif rightcol and not self.dockedright then
 								self.x = v.x + v.width
 								self.dockx = mx
 								self.dockedright = true
 								self.rightdockobject = v
-								-- if ondock then ondock(object, v) end
+								if ondock then ondock(self, v, "right", true) end
 							end
 						end
 					end
@@ -207,6 +209,8 @@ function newobject:update(dt)
 				if my > (docky + 20) or my < (docky - 20) or (x + width) < tdox or x > (tdox + tdowidth) then
 					self.dockedtop = false
 					self.docky = 0
+					self.topdockobject = false
+					if ondock then ondock(self, topdockobject, "top", false) end
 				end
 			end
 			if dockedbottom then
@@ -216,6 +220,8 @@ function newobject:update(dt)
 				if my > (docky + 20) or my < (docky - 20) or (x + width) < bdox or x > (bdox + bdowidth) then
 					self.dockedbottom = false
 					self.docky = 0
+					self.bottomdockobject = false
+					if ondock then ondock(self, bottomdockobject, "bottom", false) end
 				end
 			end
 			if dockedleft then
@@ -225,6 +231,8 @@ function newobject:update(dt)
 				if mx > (dockx + 20) or mx < (dockx - 20) or (y + height) < ldoy or y > (ldoy + ldoheight) then
 					self.dockedleft = false
 					self.dockx = 0
+					self.leftdockobject = false
+					if ondock then ondock(self, leftdockobject, "left", false) end
 				end
 			end
 			if dockedright then
@@ -234,6 +242,8 @@ function newobject:update(dt)
 				if mx > (dockx + 20) or mx < (dockx - 20) or (y + height) < rdoy or y > (rdoy + rdoheight) then
 					self.dockedright = false
 					self.dockx = 0
+					self.rightdockobject = false
+					if ondock then ondock(self, rightdockobject, "right", false) end
 				end
 			end
 		else
