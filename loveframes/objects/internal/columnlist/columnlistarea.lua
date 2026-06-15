@@ -202,33 +202,37 @@ end
 --]]---------------------------------------------------------
 function newobject:wheelmoved(x, y)
 
+	-- only the top-most list under the cursor reacts; this also covers the
+	-- cases where the area has no scroll bar or the mouse is not actually
+	-- over it, since IsTopList relies on the current collision set. note
+	-- that raising the owning frame is intentionally NOT done here: that is
+	-- a real-interaction concern handled by mousepressed, and doing it on
+	-- every wheel event made hovering a list reorder frames unexpectedly.
+	if not self:IsTopList() then
+		return
+	end
+
 	local scrollamount = self.mousewheelscrollamount
+	local dt = self.dtscrolling and love.timer.getDelta() or 1
 
-	-- FIXME: button is nil
-	-- if self.hover and button == 1 then
-	if self.hover then
-		local baseparent = self:GetBaseParent()
-		if baseparent and baseparent.type == "frame" then
-			baseparent:MakeTop()
-		end
+	-- the vertical wheel axis drives the vertical bar, or the horizontal bar
+	-- when that is the only bar present (matches the list object's behavior
+	-- so a normal mouse wheel can still scroll a horizontal-only list)
+	local primary = false
+	if self.vbar then
+		primary = self:GetVerticalScrollBody():GetScrollBar()
+	elseif self.hbar then
+		primary = self:GetHorizontalScrollBody():GetScrollBar()
 	end
 
-	local bar = false
-	if self.vbar and self.hbar then
-		bar = self:GetVerticalScrollBody():GetScrollBar()
-	elseif self.vbar and not self.hbar then
-		bar = self:GetVerticalScrollBody():GetScrollBar()
-	elseif not self.vbar and self.hbar then
-		bar = self:GetHorizontalScrollBody():GetScrollBar()
+	if primary and y ~= 0 then
+		primary:Scroll(-y * scrollamount * dt)
 	end
 
-	if self:IsTopList() and bar then
-		if self.dtscrolling then
-			local dt = love.timer.getDelta()
-			bar:Scroll(-y * scrollamount * dt)
-		else
-			bar:Scroll(-y * scrollamount)
-		end
+	-- when both bars exist the horizontal wheel axis drives the horizontal
+	-- bar, so it is reachable instead of being silently ignored
+	if self.vbar and self.hbar and x ~= 0 then
+		self:GetHorizontalScrollBody():GetScrollBar():Scroll(-x * scrollamount * dt)
 	end
 
 end
