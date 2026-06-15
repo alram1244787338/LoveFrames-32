@@ -271,6 +271,10 @@ end
 --]]------------------<---------------------------------------
 function newobject:wheelmoved(x, y)
 
+	if not self.visible then
+		return
+	end
+
 	local toplist = self:IsTopList()
 	local vbar = self.vbar
 	local hbar = self.hbar

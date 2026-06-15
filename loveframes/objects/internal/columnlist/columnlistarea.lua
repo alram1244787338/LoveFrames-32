@@ -202,32 +202,57 @@ end
 --]]---------------------------------------------------------
 function newobject:wheelmoved(x, y)
 
-	local scrollamount = self.mousewheelscrollamount
+	if not self.visible then
+		return
+	end
 
-	-- FIXME: button is nil
-	-- if self.hover and button == 1 then
-	if self.hover then
-		local baseparent = self:GetBaseParent()
-		if baseparent and baseparent.type == "frame" then
-			baseparent:MakeTop()
+	local scrollamount = self.mousewheelscrollamount
+	local mx, my = love.mouse.getPosition()
+
+	-- Only respond if the mouse is actually within this area's bounds.
+	-- Use a direct bounds check rather than self.hover, because self.hover
+	-- is false when a child (e.g. scrollbar) has stolen the hover state.
+	local inbounds = loveframes.BoundingBox(mx, self.x, my, self.y, 1, self.width, 1, self.height)
+	if not inbounds then
+		return
+	end
+
+	if not self:IsTopList() then
+		return
+	end
+
+	-- NOTE: frame MakeTop() is intentionally NOT called here.
+	-- Bringing the frame to front should only happen on a real mouse button
+	-- press (see mousepressed), not on scroll events.  Calling MakeTop from
+	-- wheelmoved caused the parent frame to jump to the top whenever the
+	-- cursor merely passed over the list area while scrolling.
+
+	-- Resolve the correct scrollbar for each scroll direction.
+	local vbar = self.vbar
+	local hbar = self.hbar
+
+	if not vbar and not hbar then
+		return
+	end
+
+	local dtscrolling = self.dtscrolling
+	local dt = dtscrolling and love.timer.getDelta() or 1
+
+	-- Vertical scroll (y wheel delta) — only when a vertical bar exists
+	if vbar and y ~= 0 then
+		local vbody = self:GetVerticalScrollBody()
+		if vbody then
+			local vscrollbar = vbody:GetScrollBar()
+			vscrollbar:Scroll(-y * scrollamount * dt)
 		end
 	end
 
-	local bar = false
-	if self.vbar and self.hbar then
-		bar = self:GetVerticalScrollBody():GetScrollBar()
-	elseif self.vbar and not self.hbar then
-		bar = self:GetVerticalScrollBody():GetScrollBar()
-	elseif not self.vbar and self.hbar then
-		bar = self:GetHorizontalScrollBody():GetScrollBar()
-	end
-
-	if self:IsTopList() and bar then
-		if self.dtscrolling then
-			local dt = love.timer.getDelta()
-			bar:Scroll(-y * scrollamount * dt)
-		else
-			bar:Scroll(-y * scrollamount)
+	-- Horizontal scroll (x wheel delta) — only when a horizontal bar exists
+	if hbar and x ~= 0 then
+		local hbody = self:GetHorizontalScrollBody()
+		if hbody then
+			local hscrollbar = hbody:GetScrollBar()
+			hscrollbar:Scroll(x * scrollamount * dt)
 		end
 	end
 

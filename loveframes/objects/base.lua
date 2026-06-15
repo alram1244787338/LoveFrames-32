@@ -898,45 +898,33 @@ end
 --[[---------------------------------------------------------
 	- func: IsTopList()
 	- desc: returns true if the object is the top most list
-			object or false if not
+			object or false if not.
+			Uses the hover object's parent chain to determine
+			whether this object is the topmost scrollable
+			element under the cursor.  This correctly handles
+			overlapping widgets from different parent chains
+			(e.g. a list behind an unrelated frame).
 --]]---------------------------------------------------------
 function newobject:IsTopList()
 
-	local cols = loveframes.GetCollisions()
-	local children = self:GetChildren()
-	local order = self.draworder
-	local top = true
-	local found = false
-	
-	local function IsChild(object)
-		local parents = object:GetParents()
-		for k, v in ipairs(parents) do
-			if v == self then
-				return true
-			end
-		end
+	local hoverobject = loveframes.hoverobject
+	if not hoverobject then
 		return false
 	end
-	
-	for k, v in ipairs(cols) do
-		if v == self then
-			found = true
-		else
-			if v.draworder > order then
-				if IsChild(v) ~= true then
-					top = false
-					break
-				end
-			end
+
+	-- Walk up from the hover object.  If self is in the chain,
+	-- then self is (or contains) the topmost element under the
+	-- cursor, so it should be the one to handle the scroll.
+	local obj = hoverobject
+	while obj do
+		if obj == self then
+			return true
 		end
+		obj = obj.parent
 	end
-	
-	if found == false then
-		top = false
-	end
-	
-	return top
-	
+
+	return false
+
 end
 
 --[[---------------------------------------------------------

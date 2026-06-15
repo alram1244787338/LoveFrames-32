@@ -221,19 +221,46 @@ end
 --]]---------------------------------------------------------
 function newobject:wheelmoved(x, y)
 
-	local toplist = self:IsTopList()
+	if not self.visible then
+		return
+	end
+
+	local mx, my = love.mouse.getPosition()
+	local inbounds = loveframes.BoundingBox(mx, self.x, my, self.y, 1, self.width, 1, self.height)
+	if not inbounds then
+		return
+	end
+
+	if not self:IsTopList() then
+		return
+	end
+
 	local vbar = self.vbar
 	local hbar = self.hbar
-	local scrollamount = self.mousewheelscrollamount
 
-	if (vbar or hbar) and toplist then
-		local bar = self:GetScrollBar()
-		local dtscrolling = self.dtscrolling
-		if dtscrolling then
-			local dt = love.timer.getDelta()
-			bar:Scroll(-y * scrollamount * dt)
-		else
-			bar:Scroll(-y * scrollamount)
+	if not vbar and not hbar then
+		return
+	end
+
+	local scrollamount = self.mousewheelscrollamount
+	local dtscrolling = self.dtscrolling
+	local dt = dtscrolling and love.timer.getDelta() or 1
+
+	-- Vertical scroll (y wheel delta) — only when a vertical bar exists
+	if vbar and y ~= 0 then
+		local vbody = self:GetVerticalScrollBody()
+		if vbody then
+			local vscrollbar = vbody:GetScrollBar()
+			vscrollbar:Scroll(-y * scrollamount * dt)
+		end
+	end
+
+	-- Horizontal scroll (x wheel delta) — only when a horizontal bar exists
+	if hbar and x ~= 0 then
+		local hbody = self:GetHorizontalScrollBody()
+		if hbody then
+			local hscrollbar = hbody:GetScrollBar()
+			hscrollbar:Scroll(x * scrollamount * dt)
 		end
 	end
 
@@ -663,7 +690,7 @@ function newobject:GetScrollBar()
 	local vbar = self.vbar
 	local hbar = self.hbar
 	local internals  = self.internals
-	
+
 	if vbar or hbar then
 		local scrollbody = internals[1]
 		local scrollarea = scrollbody.internals[1]
@@ -672,7 +699,39 @@ function newobject:GetScrollBar()
 	else
 		return false
 	end
-	
+
+end
+
+--[[---------------------------------------------------------
+	- func: GetVerticalScrollBody()
+	- desc: gets the object's vertical scroll body
+--]]---------------------------------------------------------
+function newobject:GetVerticalScrollBody()
+
+	for k, v in ipairs(self.internals) do
+		if v.bartype == "vertical" then
+			return v
+		end
+	end
+
+	return false
+
+end
+
+--[[---------------------------------------------------------
+	- func: GetHorizontalScrollBody()
+	- desc: gets the object's horizontal scroll body
+--]]---------------------------------------------------------
+function newobject:GetHorizontalScrollBody()
+
+	for k, v in ipairs(self.internals) do
+		if v.bartype == "horizontal" then
+			return v
+		end
+	end
+
+	return false
+
 end
 
 --[[---------------------------------------------------------

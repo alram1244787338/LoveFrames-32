@@ -250,6 +250,10 @@ end
 --]]---------------------------------------------------------
 function newobject:wheelmoved(x, y)
 
+	if not self.visible then
+		return
+	end
+
 	local toplist = self:IsTopList()
 	local internals = self.internals
 	local scrollamount = self.mousewheelscrollamount
