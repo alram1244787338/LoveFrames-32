@@ -594,8 +594,8 @@ function newobject:RunKey(key, istext)
 				if indicatornum == 0 then
 					if line > 1 then
 						self.line = line - 1
-						local numchars = loveframes.utf8.len(lines[self.line])
-						self:MoveIndicator(numchars)
+						self.indicatornum = loveframes.utf8.len(lines[self.line])
+						self:SyncIndicatorState()
 					end
 				else
 					self:MoveIndicator(-1)
@@ -622,7 +622,8 @@ function newobject:RunKey(key, istext)
 				if indicatornum == loveframes.utf8.len(text) then
 					if line < numlines then
 						self.line = line + 1
-						self:MoveIndicator(0, true)
+						self.indicatornum = 0
+						self:SyncIndicatorState()
 					end
 				else
 					self:MoveIndicator(1)
@@ -641,6 +642,7 @@ function newobject:RunKey(key, istext)
 					if indicatornum > loveframes.utf8.len(lines[self.line]) then
 						self.indicatornum = loveframes.utf8.len(lines[self.line])
 					end
+					self:SyncIndicatorState()
 				end
 			end
 			return
@@ -651,6 +653,7 @@ function newobject:RunKey(key, istext)
 					if indicatornum > loveframes.utf8.len(lines[self.line]) then
 						self.indicatornum = loveframes.utf8.len(lines[self.line])
 					end
+					self:SyncIndicatorState()
 				end
 			end
 			return
@@ -682,9 +685,9 @@ function newobject:RunKey(key, istext)
 						if loveframes.utf8.len(oldtext) > 0 then
 							newindicatornum = loveframes.utf8.len(lines[self.line])
 							lines[self.line] = lines[self.line] .. oldtext
-							self:MoveIndicator(newindicatornum)
+							self.indicatornum = newindicatornum
 						else
-							self:MoveIndicator(loveframes.utf8.len(lines[self.line]))
+							self.indicatornum = loveframes.utf8.len(lines[self.line])
 						end
 					end
 				end
@@ -701,6 +704,7 @@ function newobject:RunKey(key, istext)
 				elseif self.offsetx < 0 then
 					self.offsetx = 0
 				end
+				self:SyncIndicatorState()
 			end
 		elseif key == "delete" then
 			if not editable then
@@ -716,13 +720,10 @@ function newobject:RunKey(key, istext)
 					lines[line] = text
 				elseif indicatornum == loveframes.utf8.len(text) and line < #lines then
 					local oldtext = lines[line + 1]
-					if loveframes.utf8.len(oldtext) > 0 then
-						-- FIXME: newindicatornum here???
-						-- newindicatornum = loveframes.utf8.len(lines[self.line])
-						lines[self.line] = lines[self.line] .. oldtext
-					end
+					lines[line] = lines[line] .. oldtext
 					table.remove(lines, line + 1)
 				end
+				self:SyncIndicatorState()
 			end
 		elseif key == "return" or key == "kpenter" then
 			-- call onenter if it exists
@@ -993,12 +994,111 @@ function newobject:UpdateIndicator()
 	end
 	
 	return self
-	
+
+end
+
+--[[---------------------------------------------------------
+	- func: SyncIndicatorState()
+	- desc: synchronizes the cursor position, line number,
+			and scroll offsets after text modifications that
+			change line structure (e.g. cross-line delete,
+			backspace merge). Ensures the indicator is visible
+			and all internal state fields are consistent.
+--]]---------------------------------------------------------
+function newobject:SyncIndicatorState()
+
+	local lines = self.lines
+	local line = self.line
+	local curline = lines[line]
+	local font = self.font
+	local multiline = self.multiline
+
+	-- clamp line to valid range
+	if line < 1 then
+		line = 1
+		self.line = line
+	end
+	if line > #lines then
+		line = #lines
+		self.line = line
+	end
+	curline = lines[line]
+
+	-- clamp indicatornum to valid range for current line
+	local linelen = loveframes.utf8.len(curline)
+	if self.indicatornum < 0 then
+		self.indicatornum = 0
+	elseif self.indicatornum > linelen then
+		self.indicatornum = linelen
+	end
+
+	if multiline then
+		-- compute cursor pixel x on the current line
+		local indicatornum = self.indicatornum
+		local cursorwidth = 0
+		if indicatornum == 0 then
+			cursorwidth = 0
+		elseif indicatornum >= linelen then
+			cursorwidth = font:getWidth(curline)
+		else
+			cursorwidth = font:getWidth(loveframes.utf8.sub(curline, 1, indicatornum))
+		end
+
+		-- compute visible viewport width
+		local visible_width = self.width
+		if self.linenumberspanel then
+			local panel = self:GetLineNumbersPanel()
+			if panel then
+				visible_width = visible_width - panel.width
+			end
+		end
+		if self.vbar then
+			visible_width = visible_width - 16
+		end
+
+		-- cursor position relative to the visible area
+		local cursor_in_view = cursorwidth + self.textoffsetx - self.offsetx
+
+		-- adjust offsetx to keep cursor visible
+		if cursor_in_view > visible_width then
+			self.offsetx = self.offsetx + (cursor_in_view - visible_width)
+		elseif cursor_in_view < 0 then
+			self.offsetx = self.offsetx + cursor_in_view
+		end
+
+		if self.offsetx < 0 then
+			self.offsetx = 0
+		end
+
+		-- vertical: clamp offsety so current line is in view
+		local theight = font:getHeight()
+		local cursor_y = (line - 1) * theight
+		local visible_height = self.height
+		if self.hbar then
+			visible_height = visible_height - 16
+		end
+
+		if cursor_y < self.offsety then
+			self.offsety = cursor_y
+		elseif cursor_y + theight > self.offsety + visible_height then
+			self.offsety = cursor_y + theight - visible_height
+		end
+
+		if self.offsety < 0 then
+			self.offsety = 0
+		end
+	end
+
+	self.showindicator = true
+	self:UpdateIndicator()
+
+	return self
+
 end
 
 --[[---------------------------------------------------------
 	- func: AddIntoText(t, p)
-	- desc: adds text into the object's text at a given 
+	- desc: adds text into the object's text at a given
 			position
 --]]---------------------------------------------------------
 function newobject:AddIntoText(t, p)
