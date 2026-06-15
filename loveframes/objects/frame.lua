@@ -59,6 +59,7 @@ function newobject:initialize()
 	self.icon = nil
 	self.OnClose = nil
 	self.OnDock = nil
+	self.OnUndock = nil
 	self.OnResize = nil
 	
 	-- create docking zones
@@ -164,32 +165,31 @@ function newobject:update(dt)
 						local leftcol = loveframes.RectangleCollisionCheck(self.dockzones.right, v.dockzones.left)
 						local rightcol = loveframes.RectangleCollisionCheck(self.dockzones.left, v.dockzones.right)
 						local candockobject = v.dockable
-						if candockobject then
+						if candockobject and v ~= self then
 							if topcol and not dockedtop then
 								self.y = v.y - self.height
 								self.docky = my
 								self.dockedtop = true
 								self.topdockobject = v
-								-- FIXME: object?
-								-- if ondock then ondock(object, v) end
+								if ondock then ondock(self, v, "top") end
 							elseif botcol and not dockedbottom then
 								self.y = v.y + v.height
 								self.docky = my
 								self.dockedbottom = true
 								self.bottomdockobject = v
-								-- if ondock then ondock(object, v) end
+								if ondock then ondock(self, v, "bottom") end
 							elseif leftcol and not dockedleft then
 								self.x = v.x - self.width
 								self.dockx = mx
 								self.dockedleft = true
 								self.leftdockobject = v
-								-- if ondock then ondock(object, v) end
+								if ondock then ondock(self, v, "left") end
 							elseif rightcol and not dockedright then
 								self.x = v.x + v.width
 								self.dockx = mx
 								self.dockedright = true
 								self.rightdockobject = v
-								-- if ondock then ondock(object, v) end
+								if ondock then ondock(self, v, "right") end
 							end
 						end
 					end
@@ -199,6 +199,7 @@ function newobject:update(dt)
 			local docky = self.docky
 			local x = self.x
 			local y = self.y
+			local onundock = self.OnUndock
 			-- check to see if the frame should be undocked
 			if dockedtop then
 				local topdockobject = self.topdockobject
@@ -206,7 +207,9 @@ function newobject:update(dt)
 				local tdowidth = topdockobject.width
 				if my > (docky + 20) or my < (docky - 20) or (x + width) < tdox or x > (tdox + tdowidth) then
 					self.dockedtop = false
+					self.topdockobject = false
 					self.docky = 0
+					if onundock then onundock(self, topdockobject, "top") end
 				end
 			end
 			if dockedbottom then
@@ -215,7 +218,9 @@ function newobject:update(dt)
 				local bdowidth = bottomdockobject.width
 				if my > (docky + 20) or my < (docky - 20) or (x + width) < bdox or x > (bdox + bdowidth) then
 					self.dockedbottom = false
+					self.bottomdockobject = false
 					self.docky = 0
+					if onundock then onundock(self, bottomdockobject, "bottom") end
 				end
 			end
 			if dockedleft then
@@ -224,7 +229,9 @@ function newobject:update(dt)
 				local ldoheight = leftdockobject.height
 				if mx > (dockx + 20) or mx < (dockx - 20) or (y + height) < ldoy or y > (ldoy + ldoheight) then
 					self.dockedleft = false
+					self.leftdockobject = false
 					self.dockx = 0
+					if onundock then onundock(self, leftdockobject, "left") end
 				end
 			end
 			if dockedright then
@@ -233,7 +240,9 @@ function newobject:update(dt)
 				local rdoheight = rightdockobject.height
 				if mx > (dockx + 20) or mx < (dockx - 20) or (y + height) < rdoy or y > (rdoy + rdoheight) then
 					self.dockedright = false
+					self.rightdockobject = false
 					self.dockx = 0
+					if onundock then onundock(self, rightdockobject, "right") end
 				end
 			end
 		else
@@ -941,6 +950,37 @@ end
 function newobject:GetDockZoneSize()
 
 	return self.dockzonesize
+
+end
+
+--[[---------------------------------------------------------
+	- func: GetDocked()
+	- desc: gets whether or not the object is currently
+			docked to another object in any direction
+--]]---------------------------------------------------------
+function newobject:GetDocked()
+
+	return self.dockedtop or self.dockedbottom or self.dockedleft or self.dockedright
+
+end
+
+--[[---------------------------------------------------------
+	- func: GetDockInfo()
+	- desc: returns a table describing the current dock state
+			with target objects and directions
+--]]---------------------------------------------------------
+function newobject:GetDockInfo()
+
+	return {
+		dockedtop = self.dockedtop,
+		dockedbottom = self.dockedbottom,
+		dockedleft = self.dockedleft,
+		dockedright = self.dockedright,
+		topdockobject = self.topdockobject or false,
+		bottomdockobject = self.bottomdockobject or false,
+		leftdockobject = self.leftdockobject or false,
+		rightdockobject = self.rightdockobject or false,
+	}
 
 end
 
