@@ -675,17 +675,13 @@ function newobject:RunKey(key, istext)
 				end
 				if multiline then
 					if line > 1 and indicatornum == 0 then
-						local newindicatornum = 0
-						local oldtext = lines[line]
+						-- at the start of a line: merge it onto the end of the
+						-- previous line and place the cursor at the join point
+						local mergedtext = lines[line]
+						local joinpos = loveframes.utf8.len(lines[line - 1])
 						table.remove(lines, line)
-						self.line = line - 1
-						if loveframes.utf8.len(oldtext) > 0 then
-							newindicatornum = loveframes.utf8.len(lines[self.line])
-							lines[self.line] = lines[self.line] .. oldtext
-							self:MoveIndicator(newindicatornum)
-						else
-							self:MoveIndicator(loveframes.utf8.len(lines[self.line]))
-						end
+						lines[line - 1] = lines[line - 1] .. mergedtext
+						self:SetCursorPosition(line - 1, joinpos)
 					end
 				end
 				local masked = self.masked
@@ -715,13 +711,12 @@ function newobject:RunKey(key, istext)
 					text = self:RemoveFromText(indicatornum + 1)
 					lines[line] = text
 				elseif indicatornum == loveframes.utf8.len(text) and line < #lines then
-					local oldtext = lines[line + 1]
-					if loveframes.utf8.len(oldtext) > 0 then
-						-- FIXME: newindicatornum here???
-						-- newindicatornum = loveframes.utf8.len(lines[self.line])
-						lines[self.line] = lines[self.line] .. oldtext
-					end
+					-- at the end of a line: pull the next line up onto this one
+					-- and keep the cursor at the join point
+					local joinpos = loveframes.utf8.len(lines[line])
+					lines[line] = lines[line] .. lines[line + 1]
 					table.remove(lines, line + 1)
+					self:SetCursorPosition(line, joinpos)
 				end
 			end
 		elseif key == "return" or key == "kpenter" then
@@ -876,9 +871,41 @@ function newobject:MoveIndicator(num, exact)
 	
 	self.showindicator = true
 	self:UpdateIndicator()
-	
+
 	return self
-	
+
+end
+
+--[[---------------------------------------------------------
+	- func: SetCursorPosition(line, indicatornum)
+	- desc: moves the indicator to an exact line and position,
+			keeping the current line, indicator and horizontal
+			offset consistent (used by cross-line edits)
+--]]---------------------------------------------------------
+function newobject:SetCursorPosition(line, indicatornum)
+
+	local lines = self.lines
+	local numlines = #lines
+
+	-- keep the target line within the available lines
+	if line < 1 then
+		line = 1
+	elseif line > numlines then
+		line = numlines
+	end
+	self.line = line
+
+	-- a cross-line edit lands the cursor on a different line, so any
+	-- horizontal scroll from the previous line is no longer valid;
+	-- reset it and let MoveIndicator/UpdateIndicator recompute tracking
+	self.offsetx = 0
+
+	-- MoveIndicator (exact) clamps indicatornum to the new line's length
+	-- and refreshes the visual indicator position
+	self:MoveIndicator(indicatornum, true)
+
+	return self
+
 end
 
 --[[---------------------------------------------------------
